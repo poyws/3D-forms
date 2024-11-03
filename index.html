@@ -1,0 +1,222 @@
+<html><head><base href="." />
+<meta charset="UTF-8" />
+<style>
+    body {
+        margin: 0;
+        overflow: hidden;
+        background: black;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+    #info {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        color: white;
+        font-family: Arial, sans-serif;
+    }
+    #shapeButton {
+        position: fixed;
+        top: 60px;
+        left: 10px;
+        padding: 10px;
+        background: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+<div id="info">Arraste para girar o cubo<br>Use o scroll do mouse para zoom</div>
+<button id="shapeButton">Mudar forma</button>
+
+<script>
+    let scene = new THREE.Scene();
+    let camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    let renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    let points;
+    let isCube = true;
+
+    function createCube() {
+        let geometry = new THREE.BufferGeometry();
+        let positions = [];
+        let colors = [];
+
+        const density = 24; // Increased density
+        const spacing = 2 / (density - 1);
+        
+        // Create main grid points
+        for (let x = 0; x < density; x++) {
+            for (let y = 0; y < density; y++) {
+                for (let z = 0; z < density; z++) {
+                    // Add main point
+                    positions.push(
+                        (x * spacing - 1) * 0.5,
+                        (y * spacing - 1) * 0.5,
+                        (z * spacing - 1) * 0.5
+                    );
+                    colors.push(
+                        0.5 + x/(density-1) * 0.5,
+                        0.5 + y/(density-1) * 0.5,
+                        0.5 + z/(density-1) * 0.5
+                    );
+
+                    // Add additional random points around each main point
+                    for (let i = 0; i < 2; i++) {
+                        const offset = 0.02; // Small offset for scattered effect
+                        positions.push(
+                            (x * spacing - 1) * 0.5 + (Math.random() - 0.5) * offset,
+                            (y * spacing - 1) * 0.5 + (Math.random() - 0.5) * offset,
+                            (z * spacing - 1) * 0.5 + (Math.random() - 0.5) * offset
+                        );
+                        colors.push(
+                            0.5 + x/(density-1) * 0.5,
+                            0.5 + y/(density-1) * 0.5,
+                            0.5 + z/(density-1) * 0.5
+                        );
+                    }
+                }
+            }
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+        return geometry;
+    }
+
+    function createPyramid() {
+        let geometry = new THREE.BufferGeometry();
+        let positions = [];
+        let colors = [];
+
+        const density = 40;
+        const baseSize = 1;
+        const height = 1.2;
+
+        for (let x = 0; x < density; x++) {
+            for (let z = 0; z < density; z++) {
+                const xPos = (x / (density - 1) - 0.5) * baseSize;
+                const zPos = (z / (density - 1) - 0.5) * baseSize;
+                positions.push(xPos, -0.5, zPos);
+                colors.push(0.8, 0.7, 0.5);
+            }
+        }
+
+        for (let y = 0; y < density; y++) {
+            const ratio = 1 - (y / (density - 1));
+            const layerDensity = Math.ceil(density * ratio);
+            
+            for (let x = 0; x < layerDensity; x++) {
+                for (let z = 0; z < layerDensity; z++) {
+                    const xPos = ((x / (layerDensity - 1)) - 0.5) * baseSize * ratio;
+                    const yPos = (y / (density - 1)) * height - 0.5;
+                    const zPos = ((z / (layerDensity - 1)) - 0.5) * baseSize * ratio;
+                    
+                    for (let i = 0; i < 3; i++) {
+                        const offset = (Math.random() - 0.5) * 0.01;
+                        positions.push(
+                            xPos + offset,
+                            yPos + offset,
+                            zPos + offset
+                        );
+                        colors.push(
+                            0.8 - ratio * 0.3,
+                            0.7 - ratio * 0.3,
+                            0.5 - ratio * 0.3
+                        );
+                    }
+                }
+            }
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+        return geometry;
+    }
+
+    let material = new THREE.PointsMaterial({
+        size: 0.008, // Reduced point size for denser points
+        vertexColors: true,
+        sizeAttenuation: true
+    });
+
+    points = new THREE.Points(createCube(), material);
+    scene.add(points);
+
+    camera.position.z = 5;
+
+    let isDragging = false;
+    let previousMousePosition = {
+        x: 0,
+        y: 0
+    };
+
+    document.getElementById('shapeButton').addEventListener('click', () => {
+        scene.remove(points);
+        isCube = !isCube;
+        points = new THREE.Points(
+            isCube ? createCube() : createPyramid(),
+            material
+        );
+        scene.add(points);
+    });
+
+    document.addEventListener('mousedown', (e) => {
+        isDragging = true;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            let deltaMove = {
+                x: e.clientX - previousMousePosition.x,
+                y: e.clientY - previousMousePosition.y
+            };
+
+            points.rotation.y += deltaMove.x * 0.01;
+            points.rotation.x += deltaMove.y * 0.01;
+        }
+
+        previousMousePosition = {
+            x: e.clientX,
+            y: e.clientY
+        };
+    });
+
+    document.addEventListener('mouseup', (e) => {
+        isDragging = false;
+    });
+
+    document.addEventListener('wheel', (e) => {
+        camera.position.z += e.deltaY * 0.01;
+        camera.position.z = Math.max(2, Math.min(10, camera.position.z));
+    });
+
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        if (!isDragging) {
+            points.rotation.y += 0.001;
+        }
+        
+        renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    animate();
+</script>
+
+</body></html>
